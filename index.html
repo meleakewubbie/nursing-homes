@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en-US">
+ <head>
+    <meta charset="utf-8">
+    <title>Earthquake List</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+#container {
+    display: flex;
+    height: 100vh;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+#side-panel {
+    flex-basis: 500px;
+    overflow-y: scroll;
+}
+
+#map {
+    flex-grow: 1;
+}
+button {
+    margin-bottom: 10px;
+}
+table {
+    border-collapse: collapse;
+    border-spacing: 0;
+    width: 100%;
+    border: 1px solid #ddd;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 16px;
+}
+
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+#side-panel {
+    position: absolute;
+    z-index: 1; /* Stay on top */
+    top: 0;
+    right: 0;
+    background: #fff;
+    transition: 0.5s; 
+}
+#openbtn {
+    background: #222;
+    color : #fff;
+    position: absolute;
+    right: 0;
+    top: 17rem;
+    z-index: 2;
+    height: 10%;
+    border-top-left-radius: 30px;
+    border-bottom-left-radius: 30px;
+    padding: 0.5rem;
+    border: none;
+}
+#openbtn:hover {
+    cursor: pointer;
+}
+    </style>
+ </head>
+ <body>    
+    <main id="container">
+        <div id="map"></div>
+        <div id="side-panel">
+            <h2>Long Term Care - Nursing Homes</h2>
+            <button id="sortBtn">Sort by City</button>
+            
+            <table id="table">
+                <tr>
+                    <th>id</th>
+                    <th>City</th>
+                    <th>Zip Code</th>
+                </tr>
+            </table>
+        </div>
+        <button id="openbtn" onClick="sideBarHandler()">Close</button>
+    </main>
+    <script>
+    let issideBarOpen = false
+    function sideBarHandler() {
+        if(issideBarOpen) {
+            document.getElementById("side-panel").style.right = "0";
+            document.getElementById("openbtn").innerHTML = "Close"
+            issideBarOpen = false
+        }else {
+            document.getElementById("side-panel").style.right = "-400px";
+            document.getElementById("openbtn").innerHTML = "Open"
+            issideBarOpen = true
+        }
+    }
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWVsZWFrZSIsImEiOiJja3ZieG42bGwxMDB5MnZ0Mmo0MDFzdHM4In0.bU7lHROXu7TM2QQc-IvuVw';
+    let map = new mapboxgl.Map({
+        container: 'map', // container ID
+        style: 'mapbox://styles/mapbox/satellite-v9', // style URL
+        zoom: 5.5, // starting zoom
+        center: [-120.740135, 47.751076] // starting center
+    });
+
+
+async function geojsonFetch() {
+    let response, nursingHomes, washington, table;
+    response = await fetch('assets/Long_Term_Care_-_Nursing_Homes.geojson');
+    nursingHomes = await response.json();
+    response = await fetch('assets/Washington_Counties_(no_water)___washco_area.geojson');
+
+    washington = await response.json();
+    map.on('load', function loadingData() {
+
+    map.addSource('nursing-homes', {
+        type: 'geojson',
+        data: nursingHomes
+    });
+
+    map.addLayer({
+        'id': 'nuringHomes-layer',
+        'type': 'circle',
+        'source': 'nursing-homes',
+        'paint': {
+            'circle-radius': 8,
+            'circle-stroke-width': 2,
+            'circle-color': 'yellow',
+            'circle-stroke-color': 'green'
+        }
+    });
+
+
+    map.addSource('washington', {
+        type: 'geojson',
+        data: washington
+    });
+
+    map.addLayer({
+        'id': 'washington-layer',
+        'type': 'fill',
+        'source': 'washington',
+        'paint': {
+            'fill-color': '#0080ff', // blue color fill
+            'fill-opacity': 0.5
+        }
+    });
+
+});
+table = document.getElementById("table");
+let row, cell1, cell2, cell3;
+for (let i = 0; i < nursingHomes.features.length; i++) {
+    // Create an empty <tr> element and add it to the 1st position of the table:
+    row = table.insertRow(-1);
+    cell1 = row.insertCell(0);
+    cell2 = row.insertCell(1);
+    cell3 = row.insertCell(2);
+    cell1.innerHTML = nursingHomes.features[i].properties.OBJECTID;
+    cell2.innerHTML = nursingHomes.features[i].properties.nf_loc_city;
+    cell3.innerHTML = nursingHomes.features[i].properties.nf_loc_zip_cde;
+    }
+};
+
+geojsonFetch();
+//load data to the map as new layers and table on the side.
+
+let btn = document.getElementById("sortBtn");
+
+btn.addEventListener('click', sortTable);
+
+// define the function to sort table
+function sortTable(e) {
+    let table, rows, switching, i, x, y, shouldSwitch;
+    table = document.getElementById("table");
+    switching = true;
+    /*Make a loop that will continue until
+    no switching has been done:*/
+    while (switching) {
+        //start by saying: no switching is done:
+        switching = false;
+        rows = table.rows;
+        /*Loop through all table rows (except the
+        first, which contains table headers):*/
+        for (i = 1; i < (rows.length - 1); i++) {
+            //start by saying there should be no switching:
+            shouldSwitch = false;
+            /*Get the two elements you want to compare,
+            one from current row and one from the next:*/
+            x = rows[i].getElementsByTagName("td")[1];
+            y = rows[i + 1].getElementsByTagName("td")[1];
+            //check if the two rows should switch place:
+            if (x.innerHTML.trim().toLowerCase() > y.innerHTML.trim().toLowerCase()) {
+                //if so, mark as a switch and break the loop:
+                shouldSwitch = true;
+                break;
+            }
+        }
+        if (shouldSwitch) {
+            /*If a switch has been marked, make the switch
+            and mark that a switch has been done:*/
+            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+            switching = true;
+        }
+    }
+}
+    </script>
+ </body>   
+<html>    
